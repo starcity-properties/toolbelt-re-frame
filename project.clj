@@ -1,4 +1,4 @@
-(defproject starcity/toolbelt-re-frame "0.1.0"
+(defproject starcity/toolbelt-re-frame "0.2.0-SNAPSHOT"
   :description "Utility functions and fx for working with re-frame."
   :url "https://github.com/starcity-properties/toolbelt-re-frame"
   :license {:name "Eclipse Public License"
