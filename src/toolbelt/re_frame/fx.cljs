@@ -1,10 +1,10 @@
 (ns toolbelt.re-frame.fx
-  (:require [re-frame.core :refer [reg-fx]]
-            [re-frame.router :as router]
-            [re-frame.fx :refer [register]]
-            [re-frame.interop :refer [set-timeout!]]
-            [re-frame.loggers :refer [console]]
-            [toolbelt.core :refer [find-by]]))
+  (:require
+    [re-frame.core :as rf]
+    [re-frame.registrar :as reg]
+    [re-frame.router :as router]
+    [re-frame.interop :refer [set-timeout!]]
+    [toolbelt.core :as tb]))
 
 ;; =============================================================================
 ;; Search Throttling
@@ -60,35 +60,35 @@
         (router/dispatch deferred-dispatch))
       (swap! throttled-events dissoc id))))
 
-(register
- :dispatch-throttle
- (fn [dispatches]
-   (let [dispatches (if (sequential? dispatches) dispatches [dispatches])]
-     (doseq [{:keys [id action dispatch window-duration leading? trailing?] :as effect
-              :or   {action :dispatch
-                     leading? true}}
-             dispatches]
-       (case action
+(reg/register-handler  :fx
+  :dispatch-throttle
+  (fn [dispatches]
+    (let [dispatches (if (sequential? dispatches) dispatches [dispatches])]
+      (doseq [{:keys [id action dispatch window-duration leading? trailing?] :as effect
+               :or   {action   :dispatch
+                      leading? true}}
+              dispatches]
+        (case action
 
-         :dispatch (if (or (empty? dispatch) (not (number? window-duration)))
-                     (console :error "re-frame: ignoring bad :dispatch-throttle value:" effect)
-                     (let [new-event? (nil? (id @throttled-events))]
-                       (swap! throttled-events #(-> %
-                                                    (assoc-in [id :deferred-dispatch] dispatch)
-                                                    (assoc-in [id :leading?] leading?)
-                                                    (assoc-in [id :trailing?] trailing?)))
-                       (if new-event?
-                         (do
-                           (swap! throttled-events assoc-in [id :timeout] (set-timeout! #(on-trailing-edge id) window-duration))
-                           (on-leading-edge id)))))
+          :dispatch (if (or (empty? dispatch) (not (number? window-duration)))
+                      (rf/console :error "re-frame: ignoring bad :dispatch-throttle value:" effect)
+                      (let [new-event? (nil? (id @throttled-events))]
+                        (swap! throttled-events #(-> %
+                                                   (assoc-in [id :deferred-dispatch] dispatch)
+                                                   (assoc-in [id :leading?] leading?)
+                                                   (assoc-in [id :trailing?] trailing?)))
+                        (if new-event?
+                          (do
+                            (swap! throttled-events assoc-in [id :timeout] (set-timeout! #(on-trailing-edge id) window-duration))
+                            (on-leading-edge id)))))
 
-         :cancel (do
-                   (clear-timeout! (get-in [id :timeout] @throttled-events))
-                   (swap! throttled-events dissoc id))
+          :cancel (do
+                    (clear-timeout! (get-in [id :timeout] @throttled-events))
+                    (swap! throttled-events dissoc id))
 
-         :flush (on-trailing-edge id)
+          :flush (on-trailing-edge id)
 
-         (console :error "re-frame: bad dispatch-throttle action:" action "id: " id))))))
+          (rf/console :error "re-frame: bad dispatch-throttle action:" action "id: " id))))))
 
 ;; =============================================================================
 ;; Load Scripts
@@ -103,9 +103,9 @@
 
 (defn- script-loaded? [src]
   (let [scripts (js->clj (.querySelectorAll js/document "script"))]
-    (find-by #(= (.-src %) src) scripts)))
+    (tb/find-by #(= (.-src %) src) scripts)))
 
-(reg-fx
+(rf/reg-fx
  :load-scripts
  (fn [scripts]
    (doall
